@@ -1,0 +1,426 @@
+Notes related to PostgreSQL
+
+
+-- postgres doesn't have describe functionality!
+select column_name, data_type, character_maximum_length
+from INFORMATION_SCHEMA.COLUMNS where table_name = '<name of table>';
+
+-- for text searching use like
+-- % represents wildcard
+where name like 'M%'
+
+-- 2 alternatives for not equals
+where not department = 'Sports'
+where department != 'Sports'
+
+-- cannot use equality with nulls - need to use specific is operator
+where email is not null
+where email is null
+
+-- can include list of values to check using in operator
+where department in ('Sports', 'First Aid', 'Toys')
+
+-- between is inclusive so will include someone making 80,000 and someone making 100,000
+where salary between 80000 and 100000
+
+-- order by defaults to ascending from smallest to largest value
+-- specify desc if want to order largest to smallest value
+order by employee_id desc;
+
+-- unique list of all departments in table in alphabetical order
+select distinct department
+from employees
+order by 1;
+
+-- column aliases
+select first_name as "First Name", last_name as "Last Name", salary as "Annual Salary"
+from employees;
+
+-- string functions
+length()
+trim() --remove whitespace
+
+-- create new columns from existing columns
+-- || concats values from tables
+select first_name || ' ' || last_name as "Full Name"
+from employees;
+
+-- use boolean expression to populate column with true or false
+-- show true values first (true is greater than false)
+select first_name || ' ' || last_name as "Full Name", (salary > 100000) as "6 Figure Salary"
+from employees
+order by 2 desc;
+
+-- start extracting from position 1 for a total of 4 characters
+select substring('this is test data' from 1 for 4)
+
+-- start extracting from position 1 for a total of 4 characters
+select substring('this is test data' from 1 for 4)
+
+-- replace string content
+select department, replace(department, 'Clothing', 'Attire')
+from departments;
+
+-- get only domain name from email
+select substring(email, position('@' in email) + 1) domain_name
+from employees
+where email is not null;
+
+-- get only domain name from email
+select substring(email, position('@' in email) + 1) domain_name
+from employees
+where email is not null;
+
+-- single row function = # of input rows = # of output rows
+-- grouping functions = aggregate input rows > single output
+
+-- round average salary data to whole number
+select round(avg(salary))
+from employees;
+
+-- get the total salary paid per department
+select department, sum(salary)
+from employees
+group by department;
+
+-- get the total count of employees working per department
+select department, count(employee_id)
+from employees
+group by department;
+
+-- get metrics per department
+select department,
+count(employee_id)
+total_num_emp,
+round(avg(salary)) avg_salary,
+min(salary) min_sal,
+max(salary) max_sal
+from employees
+group by department
+order by total_num_emp desc;
+
+-- any nonaggregate columns in select list must be included in group by
+select department, gender, count(*)
+from employees
+group by department, gender
+order by department;
+
+-- use having when filtering by aggregated date
+select department, gender, count(*)
+from employees
+group by department, gender
+having count(*) > 20
+order by department;
+
+-- what is the most common first name? use count agg
+select first_name, count(*)
+from employees
+group by first_name
+order by 2 desc
+limit 1;
+
+-- get unique departments in employee table not using distinct
+select department
+from employees
+group by department;
+
+-- get count of email domain names used
+select substring(email, position('@' in email) + 1) domain_name, count(*)
+from employees
+where email is not null
+group by domain_name
+order by 2 desc;
+
+-- get count of email domain names used
+select substring(email, position('@' in email) + 1) domain_name, count(*)
+from employees
+where email is not null
+group by domain_name
+order by 2 desc;
+
+-- use subquery to check which departments from the employee table are not listed in departments table
+select distinct department
+from employees
+where department not in (select department from departments);
+
+-- use subquery in select to compare employees salary to highest paid employee in the company
+select first_name, department, (select max(salary) from employees) - salary pay_diff
+from employees;
+
+-- if any values in the subquery are less than region_id then the employee will be included
+select * from employees
+where region_id > any (select region_id from regions where country='United States');
+
+-- if all values in the subquery are less than region_id then the employee will be included
+-- better to use all over any
+select * from employees
+where region_id > all (select region_id from regions where country='United States');
+
+-- get the mode (most frequent) salary
+-- if there are multiple salaries with the same frequency give the highest salary
+select salary from
+(select salary, count(*)
+from employees
+group by salary
+order by 2 desc, salary desc
+limit 1) a;
+
+create table dupes (
+	id integer,
+	name varchar(10)
+);
+
+insert into dupes values (1, 'FRANK');
+insert into dupes values (2, 'FRANK');
+insert into dupes values (3, 'ROBERT');
+insert into dupes values (4, 'ROBERT');
+insert into dupes values (5, 'SAM');
+insert into dupes values (6, 'FRANK');
+insert into dupes values (7, 'PETER');
+
+-- return only unique data (remove dupes - use any id) and show id
+select name, min(id)
+from dupes
+group by name
+order by name;
+
+-- what is the average salary of all employees of the company (excluding min and max salary)
+select round(avg(salary))
+from employees
+where salary not in (
+(select min(salary) from employees),
+(select max(salary) from employees)
+);
+
+-- expensive to run subquery in select statement because has to rerun for each row in the database
+select department, first_name,
+(select count(*) from employees e1 where e1.department = e2.department) total_emp_per_dept
+from employees e2
+group by department, first_name;
+
+-- use case statement to create values based on condition
+-- need to be same data type (all strings, ints, etc)
+select category, count(*)
+from
+(select
+case
+	when salary < 100000 then 'under paid'
+	when salary > 100000 and salary < 160000 then 'paid well'
+	else 'executive'
+end as category
+from employees) a
+group by category;
+
+-- transpose data to columns
+select
+sum(case when department = 'Sports' then 1 else 0 end) as sports,
+sum(case when department = 'Tools' then 1 else 0 end) as tools,
+sum(case when department = 'Clothing' then 1 else 0 end) as clothing,
+sum(case when department = 'Computers' then 1 else 0 end) as computers
+from employees;
+
+-- can use subquery with case statement
+select first_name,
+case when region_id = 1 then (select country from regions where region_id = 1) end as region1,
+case when region_id = 2 then (select country from regions where region_id = 2) end as region2,
+case when region_id = 3 then (select country from regions where region_id = 3) end as region3
+from employees;
+
+-- correlated subquery - subquery that uses values from the outer query
+-- subquery runs for each row in the original source table so can be very slow
+select first_name, salary
+from employees e1
+where salary > (select round(avg(salary)) from employees e2 where e1.department = e2.department);
+
+select first_name, salary
+from employees e1
+where salary >
+-- subquery runs for every row in outer query
+-- correlate values on a common column value
+(select round(avg(salary)) from employees e2 where e1.department = e2.department);
+
+-- can add correlated subquery as a column value
+select first_name, salary,
+(select round(avg(salary)) from employees e2 where e1.department = e2.department) as avg_dept_salary
+from employees e1;
+
+-- get department that have more than 38 employees using correlated subquery
+-- add second column with highest paid employees salary
+select department,
+(select max(salary) from employees e2 where e2.department = d.department) max_dept_salary
+from departments d
+where 38 < (select count(*) from employees e1 where e1.department = d.department);
+
+-- using correlated subqueries
+select department, first_name, salary,
+case
+	when salary = (select max(salary) from employees e3 where e.department = e3.department) then 'HIGHEST SALARY'
+	when salary = (select min(salary) from employees e4 where e.department = e4.department) then 'LOWEST SALARY'
+end as salary_in_department
+from employees e
+where salary = (select max(salary) from employees e1 where e.department = e1.department)
+or salary = (select min(salary) from employees e2 where e.department = e2.department)
+order by department, salary desc;
+
+-- can join without using join command
+select first_name, email, division
+from employees, departments
+where email is not null
+and employees.department = departments.department;
+
+-- inner join
+select first_name, d.department, country, region
+from employees e
+inner join regions r
+on e.region_id = r.region_id
+-- this join is joining on the results of the inner join between employees and regions
+inner join departments d
+on e.department = d.department;
+
+-- left join - provide value in left table and fill right table with null
+-- right join - provide value in right table and fill left table with null
+-- outer join - provider value if available and fill any lack of association with null
+
+-- show only departments that exist in employees table, not departments table
+select distinct e.department
+from employees e left join departments d
+on e.department = d.department
+where d.department is null;
+
+-- get all distinct values from multiple datasets
+select department from employees
+union
+select department from departments;
+
+-- get all values (including repeats) from multiple datasets
+select department from employees
+union all
+select department from departments;
+
+-- except takes values from first dataset and removes from second dataset
+select department from employees
+except
+select department from departments;
+
+select department from departments
+except
+select department from employees;
+
+-- get department with total employee count per department
+-- at the end have a total column with a sum of all employees
+select department, count(*)
+from employees
+group by department
+union all
+select 'TOTAL', count(*)
+from employees;
+
+-- cartesian product results in every possible combination of rows
+-- 24 department rows x 1000 employee rows = 2400 resulting rows
+select * from employees, departments;
+-- cross join is a more explicit way to express the same thing
+select * from employees cross join departments;
+
+-- compute sum of salary for every 90 day period
+-- use correlated subquery to check a range of data
+select hire_date, salary,
+(select sum(salary) from employees e2
+ where e2.hire_date between e1.hire_date - 90 and e1.hire_date) as spending_budget
+from employees e1
+order by hire_date;
+
+-- view = virtual table
+-- not an actual table you can insert and delete from
+-- allows you to save a query into a virtual table for reuse
+-- usually prefix with v_ to clarify it is a view not a table
+create view v_employee_information as
+select first_name, email, e.department, salary, division, region, country
+from employees e, departments d, regions r
+where e.department = d.department
+and e.region_id = r.region_id;
+
+-- why are correlated subqueries slower that non-correlated subqueries and joins?
+the subquery has to run for every column in the source table, while non-correlated subqueries and joins run once for the query
+
+-- better to use a window function over correlated sub-query
+select first_name, department, count(*) over(partition by department) total_emp_per_dept
+from employees;
+
+-- window = dataset you want to compute an aggregation on
+-- changes based on partition
+
+-- get running total of salaries as employees are hired
+select first_name, hire_date, salary,
+-- sums all rows preceding current row plus current row
+sum(salary) over(order by hire_date range between unbounded preceding and current row) running_total
+from employees;
+
+select first_name, hire_date, salary,
+-- can remove keywords because assumed default behavior
+sum(salary) over(order by hire_date) running_total
+from employees;
+
+-- can also group by using partition
+select first_name, hire_date, department, salary,
+sum(salary) over(partition by department order by hire_date) running_total
+from employees;
+
+-- sum just the previous row
+select first_name, hire_date, department, salary,
+sum(salary) over(order by hire_date rows between 1 preceding and current row) last_two_hires
+from employees;
+
+-- rank employees by salary
+select first_name, email, department, salary,
+rank() over(partition by department order by salary desc)
+from employees;
+
+-- get top earning employee per department
+select * from (
+select first_name, email, department, salary,
+rank() over(partition by department order by salary desc)
+from employees) a
+where rank = 1;
+
+-- split each department into 5 salary brackets
+select first_name, email, department, salary,
+ntile(5) over(partition by department order by salary desc) salary_bracket
+from employees;
+
+-- populate all columns in the department with first value in the department
+select first_name, email, department, salary,
+first_value(salary) over(partition by department order by salary desc) first_value
+from employees;
+
+-- populate all columns in the department with fifth highest salary in the department
+select first_name, email, department, salary,
+nth_value(salary, 5) over(partition by department order by salary desc) fifth_value
+from employees;
+
+-- lead function
+select first_name, last_name, salary, lead(salary) over() next_salary
+from employees;
+
+-- lag function
+select first_name, last_name, salary, lag(salary) over() next_salary
+from employees;
+
+-- group by multiple columns
+select continent, country, city, sum(units_sold)
+from sales
+group by grouping sets(continent, country, city);
+
+select continent, country, city, sum(units_sold)
+from sales
+-- empty bracket will get the sum of all units sold
+group by grouping sets(continent, country, city, ());
+
+-- group by multiple combos of columns
+select continent, country, city, sum(units_sold)
+from sales
+group by rollup(continent, country, city);
+
+-- group by all possible combos of columns
+select continent, country, city, sum(units_sold)
+from sales
+group by cube(continent, country, city);

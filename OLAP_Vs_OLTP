@@ -1,0 +1,57 @@
+###################################
+OLAP vs OLTP
+###################################
+OLAP = online analytical processing
+allow for complex analytical and ad-hoc queries
+focus on aggregations
+optimized for reads
+use dimensional modeling for architecture design
+
+OLTP = online transactional processing
+less complex queries in large volumes
+for read, insert, update, and delete queries
+use normal modeling for architecture design
+
+##############################
+data warehouse vs data lake
+##############################
+---------------------------------------------------------------------------------------------------------
+				| data warehouse							| data lake
+---------------------------------------------------------------------------------------------------------
+data form		| tabular									| all formats
+value			| high only									| high, medium, to be discovered
+ingestion		| ETL										| ELT
+data model		| star/snowflake conformed dimensions		| star/snowflake possible but
+				| data marts								| other ad-hoc representations possible
+				| OLAP cubes
+schema			| known before ingestion					| on the fly at the time of analysis
+				| schema-on-write							| schema-on-read
+technology		| expensive hardware						| commodity hardware with parallelism default
+data quality	| high with effort for consistency			| mixed
+				| clear rules of accessibility				| some data remains in raw format
+				| 											| some data transformed to higher quality
+users			| business analysts							| data scientists
+				| 											| business analysts
+				| 											| ML engineers
+analytics		| reports + BI visualizations				| ML, graph analytics, and data exploration
+
+######
+S3
+######
+be careful with making data in your S3 bucket publicly available
+you may end up having to pay lots of fees in data transfers from your bucket if you share this link
+and many people access large amounts of data with it
+
+#######
+views
+#######
+view
+virtual table that represents the results of a database query
+when you query a view, the DBMS converts it to the ultimate query being ran against the table the view was created on top of
+the result can be dynamic if the underlying table has changed
+
+materialized view
+database object that contains the results of a query
+cached as a concrete table
+the result is not dynamic
+only if the view is manually updated and the underlying table has been updated can the result of the materialized view change
